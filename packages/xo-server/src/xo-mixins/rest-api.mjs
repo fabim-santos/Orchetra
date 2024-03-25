@@ -6,8 +6,10 @@ import { ifDef } from '@xen-orchestra/defined'
 import { featureUnauthorized, invalidCredentials, noSuchObject } from 'xo-common/api-errors.js'
 import { pipeline } from 'node:stream/promises'
 import { json, Router } from 'express'
+import { Readable } from 'node:stream'
 import cloneDeep from 'lodash/cloneDeep.js'
 import path from 'node:path'
+import pDefer from 'promise-toolbox/defer'
 import pick from 'lodash/pick.js'
 import * as CM from 'complex-matcher'
 import { VDI_FORMAT_RAW, VDI_FORMAT_VHD } from '@xen-orchestra/xapi'
@@ -367,7 +369,42 @@ export default class RestApi {
       },
     }
     collections.restore = {}
-    collections.tasks = {}
+    collections.tasks = {
+      async getObject(id, req) {
+        const { wait } = req.query
+        if (wait === undefined) {
+          const { promise, resolve } = pDefer()
+          const stopWatch = await app.tasks.watch(id, task => {
+            if (wait !== 'result' || task.status !== 'pending') {
+              stopWatch()
+              resolve(task)
+            }
+          })
+          req.on('close', stopWatch)
+          return promise
+        } else {
+          return app.tasks.get(id)
+        }
+      },
+      getObjects(filter, limit) {
+        return app.tasks.list({ filter, limit })
+      },
+      watch(req) {
+        const stream = new Readable({ objectMode: true, read: noop })
+        const onUpdate = object => {
+          stream.push(['update', object])
+        }
+        const onRemove = id => {
+          stream.push(['remove', id])
+        }
+        app.tasks.on('update', onUpdate).on('remove', onRemove)
+        req.on('close', () => {
+          app.tasks.off('update', onUpdate).off('remove', onRemove)
+          stream.destroy()
+        })
+        return stream[Symbol.asyncIterator]()
+      },
+    }
     collections.users = {
       getObject(id) {
         return app.getUser(id).then(getUserPublicProperties)
@@ -523,43 +560,12 @@ export default class RestApi {
       )
 
     api
-      .get(
-        '/tasks',
-        wrap(async (req, res) => {
-          const { filter, limit } = req.query
-          const tasks = app.tasks.list({
-            filter: handleOptionalUserFilter(filter),
-            limit: ifDef(limit, Number),
-          })
-          await sendObjects(tasks, req, res)
-        })
-      )
       .delete(
         '/tasks',
         wrap(async (req, res) => {
           await app.tasks.clearLogs()
           res.sendStatus(200)
         })
-      )
-      .get(
-        '/tasks/:id',
-        wrap(async (req, res) => {
-          const {
-            params: { id },
-            query: { wait },
-          } = req
-          if (wait !== undefined) {
-            const stopWatch = await app.tasks.watch(id, task => {
-              if (wait !== 'result' || task.status !== 'pending') {
-                stopWatch()
-                res.json(task)
-              }
-            })
-            req.on('close', stopWatch)
-          } else {
-            res.json(await app.tasks.get(id))
-          }
-        }, true)
       )
       .delete(
         '/tasks/:id',
@@ -589,12 +595,15 @@ export default class RestApi {
     api.get(
       '/:collection',
       wrap(async (req, res) => {
-        const { query } = req
-        await sendObjects(
-          await req.collection.getObjects(handleOptionalUserFilter(query.filter), ifDef(query.limit, Number)),
-          req,
-          res
-        )
+        const { collection, query } = req
+
+        const filter = handleOptionalUserFilter(query.filter)
+
+        if (Object.hasOwn(query, 'ndjson') && Object.hasOwn(query, 'watch')) {
+          return await sendObjects(collection.watch(req), req, res)
+        }
+
+        await sendObjects(await collection.getObjects(filter, ifDef(query.limit, Number)), req, res)
       })
     )
 
