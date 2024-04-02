@@ -62,13 +62,15 @@ export default class Xostor {
 
     await onEachAttachedHost(this, ref, async ({ hostRef, groupName }) => {
       const hostname = await this.getField('host', hostRef, 'hostname')
-      const { pifUuid } = pifInfos.find(_pif => _pif.hostRef === hostRef)
-
+      const pif = pifInfos.find(_pif => _pif.hostRef === hostRef)
+      if (pif === undefined) {
+        throw new Error(`No PIF found that links host: ${hostRef} to network: ${networkRef}`)
+      }
       await linstorManagerCall(this, hostRef, 'createNodeInterface', {
         groupName,
         hostname,
         name: interfaceName,
-        pifUuid,
+        pifUuid: pif.pifUuid,
       })
       $defer.onFailure(() =>
         linstorManagerCall(this, hostRef, 'destroyNodeInterface', {
@@ -86,7 +88,7 @@ export default class Xostor {
     }
 
     /**
-     * FIXME: dissuced with Ronan:
+     * FIXME: discussed with Ronan:
      * When implemented on the linstor-manager plugin, call `get_preferred_interface`
      * then switch the preferred interface to default if `interfaceName` equal the `preferred_interface`.
      */
