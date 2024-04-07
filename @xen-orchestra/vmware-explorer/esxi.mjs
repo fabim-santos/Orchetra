@@ -9,7 +9,8 @@ import https from 'https'
 import parseVmdk from './parsers/vmdk.mjs'
 import parseVmsd from './parsers/vmsd.mjs'
 import parseVmx from './parsers/vmx.mjs'
-import fs from 'node:fs/promises'
+
+import xml2js from 'xml2js'
 
 const { warn } = createLogger('xo:vmware-explorer:esxi')
 
@@ -61,8 +62,8 @@ export default class Esxi extends EventEmitter {
         client.off('result', resolve)
         reject(error)
       })
-      client.runCommand(cmd, args).once('result', function ( result, raw, soapHeader) {
-        client.off('error', reject) 
+      client.runCommand(cmd, args).once('result', function (result, raw, soapHeader) {
+        client.off('error', reject)
         resolve(...arguments)
       })
     })
@@ -265,11 +266,10 @@ export default class Esxi extends EventEmitter {
   }
 
   async getTransferableVmMetadata(vmId) {
-    const search = await this.search('VirtualMachine', ['name', 'config', 'storage', 'runtime', 'snapshot'])
-    if (search[vmId] === undefined) {
-      throw new Error(`VM ${vmId} not found `)
-    }
-    const { config, runtime } = search[vmId]
+    const [config, runtime] = await Promise.all([
+      this.fetchProperty('VirtualMachine', vmId, 'config'),
+      this.fetchProperty('VirtualMachine', vmId, 'runtime'),
+    ])
 
     const [, dataStore, vmxPath] = config.files.vmPathName.match(/^\[(.*)\] (.+.vmx)$/)
     const res = await this.download(dataStore, vmxPath)
@@ -358,16 +358,17 @@ export default class Esxi extends EventEmitter {
     return this.#exec('PowerOnVM_Task', { _this: vmId })
   }
 
-  async fetchProperty(type, id, propertyName){
+  async fetchProperty(type, id, propertyName) {
     // the fetch method does not seems to be exposed by the wsdl
-    // inpired  by the pyvmomi implementation
-    const res = await fetch(`https://${this.#host}/sdk`,{
-        method:'POST',
-        headers: {
-          Cookie: this.#client.authCookie.cookies,
-        },
-        agent: this.#httpsAgent,
-        body:`<?xml version="1.0" encoding="UTF-8"?>
+    // inpired  by the pyvmomi implementation ( StubAdapterAccessorImpl.py / InvokeAccessor)
+    const res = await fetch(`https://${this.#host}/sdk`, {
+      method: 'POST',
+      headers: {
+        Cookie: this.#client.authCookie.cookies,
+        SOAPAction: '"urn:vim25/6.0"', // mandatory to have a answer when asking for httpNfcLease
+      },
+      agent: this.#httpsAgent,
+      body: `<?xml version="1.0" encoding="UTF-8"?>
         <soapenv:Envelope 
           xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" 
           xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
@@ -380,55 +381,60 @@ export default class Esxi extends EventEmitter {
               <prop >${propertyName}</prop>
             </Fetch>
           </soapenv:Body>
-        </soapenv:Envelope>`
-      })
-      const text = await res.text()
-      const response = text.match(/<returnval[^>]*>(.*)<\/returnval>/)[1]
+        </soapenv:Envelope>`,
+    })
+    const text = await res.text()
+    const matches = text.match(/<FetchResponse[^>]*>(.*)<\/FetchResponse>/)
 
-      return response
+    return new Promise((resolve, reject) => {
+      xml2js.parseString(matches?.[1] ?? '', (err, res) => (err ? reject(err) : resolve(res.returnval)))
+    })
   }
 
-  async export(vmId){
-    const exported = await  this.#exec('ExportVm', { _this: vmId }) 
-    const exportTaskId  = exported.returnval.$value 
+  async export(vmId) {
+    const exported = await this.#exec('ExportVm', { _this: vmId })
+    const exportTaskId = exported.returnval.$value
     let isReady = false
-    for(let i=0; i <10 && !isReady; i ++){
-      const state = await this.fetchProperty('HttpNfcLease',exportTaskId,  'state')
-      isReady = state ==='ready'
-      if(!isReady){
-        await new Promise(resolve=>setTimeout(resolve, 1000)) 
+    for (let i = 0; i < 10 && !isReady; i++) {
+      const state = await this.fetchProperty('HttpNfcLease', exportTaskId, 'state')
+      isReady = state._ === 'ready'
+      if (!isReady) {
+        await new Promise(resolve => setTimeout(resolve, 1000))
       }
     }
-  
-    if(!isReady){
+    if (!isReady) {
       throw new Error('not ready')
     }
 
-    const info = await this.fetchProperty('HttpNfcLease',exportTaskId,  'info') 
-    const matches = info.matchAll( /<url>(.+\.vmdk)<\/url>/g)
-    for(const match of matches){
-      const vmdkUrl = match[1]
-      const url = vmdkUrl.replace('https://*/', `https://${this.#host}/`)
-      const vmdkres = await fetch(
-        url,
-        {
-          rejectUnauthorized: false,
+    const { deviceUrl: deviceUrls } = await this.fetchProperty('HttpNfcLease', exportTaskId, 'info')
+    const streams = {}
+    for (let { url, disk, targetId } of deviceUrls) {
+      url = url[0]
+      disk = disk[0] === 'true'
+      if (!disk) {
+        // ram/cdrom/..
+        continue
+      }
+      const fullUrl = url.replace('https://*/', `https://${this.#host}/`)
+      const vmdkres = await fetch(fullUrl, {
+        rejectUnauthorized: false,
         agent: this.#httpsAgent,
         Cookie: this.#client.authCookie.cookies,
       })
-      console.log(vmdkres)
+      // console.log(vmdkres)
       const stream = vmdkres.body
-      let total = 0
-      const start = Date.now()
+      /* let total = 0
+      //const start = Date.now()
       // const fd = await fs.open('/tmp/out.vmdk', 'w')
       for await(const buffer of stream ){
         total+= buffer.length
-        console.log(buffer.length, total, Math.round(total/1024 *1000/ (Date.now() - start)))
+        // console.log(buffer.length, total, Math.round(total/1024 *1000/ (Date.now() - start)))
         // await fd.write(buffer)
       }
-      console.log('done')
+      // console.log('done') */
+      streams[targetId] = stream
     }
-   
-    return exported
+
+    return streams
   }
 }
