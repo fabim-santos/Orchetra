@@ -270,8 +270,7 @@ export default class Esxi extends EventEmitter {
       this.fetchProperty('VirtualMachine', vmId, 'config'),
       this.fetchProperty('VirtualMachine', vmId, 'runtime'),
     ])
-
-    const [, dataStore, vmxPath] = config.files.vmPathName.match(/^\[(.*)\] (.+.vmx)$/)
+    const [, dataStore, vmxPath] = config.files[0].vmPathName[0].match(/^\[(.*)\] (.+.vmx)$/)
     const res = await this.download(dataStore, vmxPath)
     const vmx = parseVmx(await res.text())
     // list datastores
@@ -337,14 +336,13 @@ export default class Esxi extends EventEmitter {
     } catch (error) {
       // no vmsd file :fall back to a full withou snapshots
     }
-
     return {
-      name_label: config.name,
-      memory: +config.hardware.memoryMB * 1024 * 1024,
-      nCpus: +config.hardware.numCPU,
+      name_label: config.name[0],
+      memory: +config.hardware[0].memoryMB[0] * 1024 * 1024,
+      nCpus: +config.hardware[0].numCPU[0],
       guestToolsInstalled: false,
-      firmware: config.firmware === 'efi' ? 'uefi' : config.firmware, // bios or uefi
-      powerState: runtime.powerState,
+      firmware: config.firmware[0] === 'efi' ? 'uefi' : config.firmware[0], // bios or uefi
+      powerState: runtime.powerState[0],
       snapshots,
       disks,
       networks,
