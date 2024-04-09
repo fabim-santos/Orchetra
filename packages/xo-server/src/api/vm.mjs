@@ -1392,18 +1392,29 @@ import_.resolve = {
 
 export { import_ as import }
 
-export async function importFromEsxi({ host, network, password, sr, sslVerify = true, stopSource = false, user, vm }) {
+export async function importFromEsxi({
+  host,
+  network,
+  password,
+  sr,
+  sslVerify = true,
+  stopSource = false,
+  user,
+  vm,
+  workDirRemote,
+}) {
   const task = await this.tasks.create({ name: `importing vm ${vm}` })
 
   const PREFIX = '[vmware]'
-
+  workDirRemote = workDirRemote ? await this.getRemote(workDirRemote) : undefined
   return Disposable.use(
+    getSyncedHandler(await this.getRemote(workDirRemote)),
     Disposable.all(
       (await this.getAllRemotes())
         .filter(({ name }) => name.toLocaleLowerCase().startsWith(PREFIX))
         .map(remote => getSyncedHandler(remote))
     ),
-    handlers => {
+    (workDirRemote, handlers) => {
       const dataStoreToHandlers = {}
       handlers.forEach(handler => {
         const name = handler._remote.name
@@ -1421,6 +1432,7 @@ export async function importFromEsxi({ host, network, password, sr, sslVerify = 
           network,
           stopSource,
           dataStoreToHandlers,
+          workDirRemote,
         })
       )
     }
@@ -1436,6 +1448,7 @@ importFromEsxi.params = {
   stopSource: { type: 'boolean', optional: true },
   user: { type: 'string' },
   vm: { type: 'string' },
+  workDirRemote: { type: 'string' },
 }
 
 /**
