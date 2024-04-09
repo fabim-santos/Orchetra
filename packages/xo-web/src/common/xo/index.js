@@ -628,6 +628,9 @@ export const subscribeCloudXoConfig = createSubscription(() =>
   fetch('./rest/v0/cloud/xo-config').then(resp => resp.json())
 )
 
+export const subscribeXostorHealthCheck = sr =>
+  createSubscription(() => _call('xostor.healthCheck', { sr: resolveId(sr) }))
+
 // System ============================================================
 
 export const apiMethods = _call('system.getMethodsInfo')
