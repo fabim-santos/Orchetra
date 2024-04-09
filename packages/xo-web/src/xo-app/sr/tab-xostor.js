@@ -87,7 +87,7 @@ export default class TabXostor extends Component {
           <Col>
             <Card>
               <CardHeader>
-                <Icon icon='disk' /> Resource list
+                <Icon icon='disk' /> {_('resourceList')}
               </CardHeader>
               <CardBlock>
                 <SortedTable collection={resourceInfos} columns={RESOURCE_COLUMNS} />

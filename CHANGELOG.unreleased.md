@@ -8,6 +8,7 @@
 > Users must be able to say: “Nice enhancement, I'm eager to test it”
 
 - [RPU] If a XOSTOR is present in the pool, _Rolling Pool Update_ is no longer available (PR [#7540](https://github.com/vatesfr/xen-orchestra/pull/7540))
+- [XOSTOR] List linstor resources in the XOSTOR tab of an SR's view (PR [#7542](https://github.com/vatesfr/xen-orchestra/pull/7542))
 
 ### Bug fixes
 
@@ -37,5 +38,8 @@
 > Keep this list alphabetically ordered to avoid merge conflicts
 
 <!--packages-start-->
+
+- xo-server minor
+- xo-web minor
 
 <!--packages-end-->
