@@ -1531,9 +1531,8 @@ const messages = {
   deleteDefaultTemplatesTitle: 'Delete default template{nDefaultTemplates, plural, one {} other {s}}',
   deleteDefaultTemplatesMessage:
     'You are attempting to delete {nDefaultTemplates, number} default template{nDefaultTemplates, plural, one {} other {s}}. Do you want to continue?',
-  deleteProtectedTemplatesTitle: 'Delete protected template{nProtectedTemplates, plural, one {} other {s}}',
-  deleteProtectedTemplatesMessage:
-    'You are attempting to delete {nProtectedTemplates, plural, one {a} other {nProtectedTemplates}} template{nProtectedTemplates, plural, one {} other {s}} protected from accidental deletion. Do you want to continue?',
+  deleteProtectedTemplatesTitle:'Delete protected template{nProtectedTemplates, plural, one {} other {s}}',
+  deleteProtectedTemplatesMessage: 'You are attempting to delete {nProtectedTemplates, plural, one {a} other {nProtectedTemplates}} template{nProtectedTemplates, plural, one {} other {s}} protected from accidental deletion. Do you want to continue?',
   // ----- Dashboard -----
   poolPanel: 'Pool{pools, plural, one {} other {s}}',
   hostPanel: 'Host{hosts, plural, one {} other {s}}',
@@ -2591,8 +2590,7 @@ const messages = {
   poolNotRecentEnough: 'Not recent enough. Current version: {version}',
   replication: 'Replication',
   resourceList: 'Resource list',
-  rpuNoLongerAvailableIfXostor:
-    'As long as a XOSTOR storage is present in the pool, Rolling Pool Update will not be available',
+  rpuNoLongerAvailableIfXostor: 'As long as a XOSTOR storage is present in the pool, Rolling Pool Update will not be available',
   selectDisks: 'Select disk(s)…',
   selectedDiskTypeIncompatibleXostor: 'Only disks of type "Disk" and "Raid" are accepted. Selected disk type: {type}.',
   storage: 'Storage',
