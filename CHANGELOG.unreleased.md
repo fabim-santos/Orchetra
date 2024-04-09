@@ -21,6 +21,7 @@
 - [VMWare/Migration] Don't fail all VMs if one does not have any disks (PR [#7530](https://github.com/vatesfr/xen-orchestra/pull/7530))
 - [Plugin/perf-alert] Fix important CPU & memory usage (broken in XO 5.93.0)
 - [New/VM] Correctly detects if the template requires a VTPM device
+- [Plugin/load-balancer] Density plan will no longer try to migrate VMs to a host which is reaching critical memory or CPU usage (PR [#7544](https://github.com/vatesfr/xen-orchestra/pull/7544))
 
 ### Packages to release
 
@@ -37,5 +38,7 @@
 > Keep this list alphabetically ordered to avoid merge conflicts
 
 <!--packages-start-->
+
+- xo-server-load-balancer patch
 
 <!--packages-end-->
