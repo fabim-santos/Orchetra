@@ -73,7 +73,14 @@ async function _importDiskChain(
 
 const importDiskChain = defer(_importDiskChain)
 
-export const importDisk = async function importDisks({ esxi, dataStoreToHandlers, vm, chainsByNodes, sr, vhds = [] }) {
+export const importDisksFromDatastore = async function importDisksFromDatastore({
+  esxi,
+  dataStoreToHandlers,
+  vm,
+  chainsByNodes,
+  sr,
+  vhds = [],
+}) {
   return await Promise.all(
     Object.keys(chainsByNodes).map(async (node, userdevice) =>
       Task.run({ properties: { name: `Cold import of disks ${node}` } }, async () => {
