@@ -11,6 +11,8 @@
 
 > Users must be able to say: “I had this issue, happy to know it's fixed”
 
+- [VMWare/import ] fix ` Cannot read properties of undefined (reading 'match')`
+
 ### Packages to release
 
 > When modifying a package, add it here with its release type.
@@ -27,6 +29,7 @@
 
 <!--packages-start-->
 
+- @xen-orchestra/vmware-explorer patch
 - xo-server patch
 
 <!--packages-end-->
